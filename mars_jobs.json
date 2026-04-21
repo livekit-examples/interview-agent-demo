@@ -1,0 +1,305 @@
+{
+  "org": "mars-recruitment-services",
+  "count": 12,
+  "jobs": [
+    {
+      "id": "mrs-habitat-systems-engineer",
+      "title": "Habitat Systems Engineer",
+      "department": "Engineering",
+      "team": "Habitat Systems",
+      "location": "Utopia Planitia Settlement, Mars",
+      "secondary_locations": [],
+      "employment_type": "FullTime",
+      "is_remote": false,
+      "is_listed": true,
+      "published_at": "2026-01-15T00:00:00.000+00:00",
+      "updated_at": null,
+      "compensation": {
+        "compensationTierSummary": "$520K – $780K • Settler equity + hazard differential",
+        "compensationTiers": [],
+        "summaryComponents": [
+          {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 520000, "maxValue": 780000},
+          {"compensationType": "EquityPercentage", "interval": "NONE", "currencyCode": null, "minValue": null, "maxValue": null}
+        ]
+      },
+      "application_url": "https://mars-recruitment.services/careers/habitat-systems-engineer/apply",
+      "job_url": "https://mars-recruitment.services/careers/habitat-systems-engineer",
+      "description_html": null,
+      "description_plain": "Mars Recruitment Services is hiring a Habitat Systems Engineer to join our Utopia Planitia settlement team. You will own the life-support envelope: pressurization, thermal management, atmospheric composition, and redundant O2 and CO2 scrubbing for a pressurized habitat housing more than 200 settlers. Expect to be the engineer on call when a dust storm blacks out a solar array, a micrometeoroid punctures a regolith-shielded dome, or a thermal loop loses half its coolant at three a.m. local. Minimum seven-year rotation."
+    },
+    {
+      "id": "mrs-astrobotanist-hydroponics",
+      "title": "Astrobotanist, Hydroponics Lead",
+      "department": "Life Sciences",
+      "team": "Agriculture",
+      "location": "Olympus Base, Mars",
+      "secondary_locations": [],
+      "employment_type": "FullTime",
+      "is_remote": false,
+      "is_listed": true,
+      "published_at": "2026-01-20T00:00:00.000+00:00",
+      "updated_at": null,
+      "compensation": {
+        "compensationTierSummary": "$480K – $680K • Settler equity",
+        "compensationTiers": [],
+        "summaryComponents": [
+          {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 480000, "maxValue": 680000},
+          {"compensationType": "EquityPercentage", "interval": "NONE", "currencyCode": null, "minValue": null, "maxValue": null}
+        ]
+      },
+      "application_url": "https://mars-recruitment.services/careers/astrobotanist-hydroponics/apply",
+      "job_url": "https://mars-recruitment.services/careers/astrobotanist-hydroponics",
+      "description_html": null,
+      "description_plain": "Lead the greenhouse program that feeds Olympus Base and ships fresh produce to Gale and Jezero. You will tune nutrient solutions for zero point three eight g, engineer resilient cultivars for the twenty-four-point-six-hour sol cycle and broad-spectrum LED arrays, and diagnose failing crops in the middle of a six-month dust season. Crop diversity, yield, and crew morale all fit on one plate. Background in controlled-environment agriculture, plant physiology, or spaceflight life-sciences strongly preferred."
+    },
+    {
+      "id": "mrs-eva-operations-specialist",
+      "title": "EVA Operations Specialist",
+      "department": "Operations",
+      "team": "Surface Operations",
+      "location": "Jezero Crater Outpost, Mars",
+      "secondary_locations": [],
+      "employment_type": "FullTime",
+      "is_remote": false,
+      "is_listed": true,
+      "published_at": "2026-01-18T00:00:00.000+00:00",
+      "updated_at": null,
+      "compensation": {
+        "compensationTierSummary": "$560K – $820K • Settler equity + hazard differential",
+        "compensationTiers": [],
+        "summaryComponents": [
+          {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 560000, "maxValue": 820000},
+          {"compensationType": "EquityPercentage", "interval": "NONE", "currencyCode": null, "minValue": null, "maxValue": null}
+        ]
+      },
+      "application_url": "https://mars-recruitment.services/careers/eva-operations-specialist/apply",
+      "job_url": "https://mars-recruitment.services/careers/eva-operations-specialist",
+      "description_html": null,
+      "description_plain": "Plan, brief, and lead extravehicular expeditions across Martian terrain from the Jezero Crater Outpost. You will command surface operations end to end: route planning, suit checks, contingency response, and bringing every crew member home through dust, negative-seventy-degree nights, and the occasional cosmic-ray event. Prior space flight, military rotary-wing, or Antarctic analog experience required. Calm under pressure is not optional."
+    },
+    {
+      "id": "mrs-colony-physician",
+      "title": "Mars Colony Physician",
+      "department": "Life Sciences",
+      "team": "Medical",
+      "location": "Olympus Base, Mars",
+      "secondary_locations": [],
+      "employment_type": "FullTime",
+      "is_remote": false,
+      "is_listed": true,
+      "published_at": "2026-02-02T00:00:00.000+00:00",
+      "updated_at": null,
+      "compensation": {
+        "compensationTierSummary": "$620K – $900K • Settler equity",
+        "compensationTiers": [],
+        "summaryComponents": [
+          {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 620000, "maxValue": 900000},
+          {"compensationType": "EquityPercentage", "interval": "NONE", "currencyCode": null, "minValue": null, "maxValue": null}
+        ]
+      },
+      "application_url": "https://mars-recruitment.services/careers/mars-colony-physician/apply",
+      "job_url": "https://mars-recruitment.services/careers/mars-colony-physician",
+      "description_html": null,
+      "description_plain": "Primary-care lead for the two hundred-plus settlers at Olympus Base, with telemedicine support for Gale and Jezero. You will practice rural-remote medicine with a twist: reduced-gravity physiology, chronic cosmic-radiation exposure, regolith inhalation syndromes, and a formulary that had to fit inside a single cargo lander. Board certification in emergency medicine or family medicine preferred; wilderness, expedition, or undersea medicine experience is a strong plus."
+    },
+    {
+      "id": "mrs-isru-engineer",
+      "title": "ISRU Engineer (In-Situ Resource Utilization)",
+      "department": "Engineering",
+      "team": "Resource Production",
+      "location": "Gale Science Station, Mars",
+      "secondary_locations": [],
+      "employment_type": "FullTime",
+      "is_remote": false,
+      "is_listed": true,
+      "published_at": "2026-01-28T00:00:00.000+00:00",
+      "updated_at": null,
+      "compensation": {
+        "compensationTierSummary": "$540K – $800K • Settler equity",
+        "compensationTiers": [],
+        "summaryComponents": [
+          {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 540000, "maxValue": 800000},
+          {"compensationType": "EquityPercentage", "interval": "NONE", "currencyCode": null, "minValue": null, "maxValue": null}
+        ]
+      },
+      "application_url": "https://mars-recruitment.services/careers/isru-engineer/apply",
+      "job_url": "https://mars-recruitment.services/careers/isru-engineer",
+      "description_html": null,
+      "description_plain": "Build and operate the systems that extract oxygen from the Martian atmosphere, methane fuel from CO2 via a Sabatier process, and potable water from subsurface ice. Every kilogram we make on Mars is a kilogram we do not have to launch from Earth. You will lead scale-up of the next-generation electrolysis reactor and own production forecasts tied directly to the settler growth plan."
+    },
+    {
+      "id": "mrs-behavioral-health-lead",
+      "title": "Colony Behavioral Health Lead",
+      "department": "Habitability",
+      "team": "Wellness",
+      "location": "Remote, Mars Surface",
+      "secondary_locations": [],
+      "employment_type": "FullTime",
+      "is_remote": true,
+      "is_listed": true,
+      "published_at": "2026-02-10T00:00:00.000+00:00",
+      "updated_at": null,
+      "compensation": {
+        "compensationTierSummary": "$500K – $720K • Settler equity",
+        "compensationTiers": [],
+        "summaryComponents": [
+          {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 500000, "maxValue": 720000},
+          {"compensationType": "EquityPercentage", "interval": "NONE", "currencyCode": null, "minValue": null, "maxValue": null}
+        ]
+      },
+      "application_url": "https://mars-recruitment.services/careers/behavioral-health-lead/apply",
+      "job_url": "https://mars-recruitment.services/careers/behavioral-health-lead",
+      "description_html": null,
+      "description_plain": "Provide mental-health support for crews living six to twenty-four light-minutes from home. Run debriefs after fatalities and close calls, design peer-support and circadian-light programs, and quietly track the mood of every long-duration crew. Role rotates across Olympus, Utopia Planitia, and Jezero. Licensure and eight years of isolated-environment clinical experience (submarine, Antarctic, offshore, or correctional) strongly preferred."
+    },
+    {
+      "id": "mrs-exobiologist",
+      "title": "Exobiologist",
+      "department": "Life Sciences",
+      "team": "Research",
+      "location": "Jezero Crater Outpost, Mars",
+      "secondary_locations": [],
+      "employment_type": "FullTime",
+      "is_remote": false,
+      "is_listed": true,
+      "published_at": "2026-01-25T00:00:00.000+00:00",
+      "updated_at": null,
+      "compensation": {
+        "compensationTierSummary": "$490K – $720K • Settler equity",
+        "compensationTiers": [],
+        "summaryComponents": [
+          {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 490000, "maxValue": 720000},
+          {"compensationType": "EquityPercentage", "interval": "NONE", "currencyCode": null, "minValue": null, "maxValue": null}
+        ]
+      },
+      "application_url": "https://mars-recruitment.services/careers/exobiologist/apply",
+      "job_url": "https://mars-recruitment.services/careers/exobiologist",
+      "description_html": null,
+      "description_plain": "Search for evidence of past or present Martian life in Jezero's ancient river delta. You will lead sample collection, planetary-protection and contamination protocols, and the colony's scientific relationship with Earth-side space agencies. First-author contribution to a potential-life-detection publication from Mars is a plausible outcome of this role."
+    },
+    {
+      "id": "mrs-rover-robotics-tech",
+      "title": "Rover & Robotics Technician",
+      "department": "Engineering",
+      "team": "Fleet",
+      "location": "Utopia Planitia Settlement, Mars",
+      "secondary_locations": [],
+      "employment_type": "FullTime",
+      "is_remote": false,
+      "is_listed": true,
+      "published_at": "2026-02-05T00:00:00.000+00:00",
+      "updated_at": null,
+      "compensation": {
+        "compensationTierSummary": "$440K – $640K • Settler equity",
+        "compensationTiers": [],
+        "summaryComponents": [
+          {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 440000, "maxValue": 640000},
+          {"compensationType": "EquityPercentage", "interval": "NONE", "currencyCode": null, "minValue": null, "maxValue": null}
+        ]
+      },
+      "application_url": "https://mars-recruitment.services/careers/rover-robotics-technician/apply",
+      "job_url": "https://mars-recruitment.services/careers/rover-robotics-technician",
+      "description_html": null,
+      "description_plain": "Keep the colony's fleet of surface rovers, cargo drones, and construction bots running through dust, cold, and regolith abrasion. You will diagnose firmware, swap radiation-hardened boards, and occasionally field-strip a rover at negative sixty-five Celsius with gloves on. Hands-on background in diesel, aerospace maintenance, or motorsports a strong plus."
+    },
+    {
+      "id": "mrs-deep-space-comms-officer",
+      "title": "Deep-Space Communications Officer",
+      "department": "Operations",
+      "team": "Communications",
+      "location": "Earth-Orbit Training Academy, Cis-lunar",
+      "secondary_locations": [],
+      "employment_type": "FullTime",
+      "is_remote": true,
+      "is_listed": true,
+      "published_at": "2026-02-14T00:00:00.000+00:00",
+      "updated_at": null,
+      "compensation": {
+        "compensationTierSummary": "$420K – $600K",
+        "compensationTiers": [],
+        "summaryComponents": [
+          {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 420000, "maxValue": 600000}
+        ]
+      },
+      "application_url": "https://mars-recruitment.services/careers/deep-space-comms-officer/apply",
+      "job_url": "https://mars-recruitment.services/careers/deep-space-comms-officer",
+      "description_html": null,
+      "description_plain": "Orchestrate the six-to-twenty-four-minute conversation between the Mars colonies and Mission Control. Plan Deep Space Network windows, queue priority packets during emergencies, and run failover to lunar relay when the sun drifts across the line of sight. This is the only role in the catalog that does not deploy to the Martian surface: you will be stationed at the Earth-Orbit Training Academy in cis-lunar space with two-month rotations back to Earth."
+    },
+    {
+      "id": "mrs-settlement-architect",
+      "title": "Settlement Architect",
+      "department": "Habitability",
+      "team": "Design",
+      "location": "Olympus Base, Mars",
+      "secondary_locations": [],
+      "employment_type": "FullTime",
+      "is_remote": false,
+      "is_listed": true,
+      "published_at": "2026-02-08T00:00:00.000+00:00",
+      "updated_at": null,
+      "compensation": {
+        "compensationTierSummary": "$510K – $750K • Settler equity",
+        "compensationTiers": [],
+        "summaryComponents": [
+          {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 510000, "maxValue": 750000},
+          {"compensationType": "EquityPercentage", "interval": "NONE", "currencyCode": null, "minValue": null, "maxValue": null}
+        ]
+      },
+      "application_url": "https://mars-recruitment.services/careers/settlement-architect/apply",
+      "job_url": "https://mars-recruitment.services/careers/settlement-architect",
+      "description_html": null,
+      "description_plain": "Design new habitat modules, expansion domes, and shared spaces for a colony growing from 200 to 1,000 settlers over the next decade. Every cubic meter of volume matters, and every settler still needs a place to think, grow, cook, and recover. Prior experience with pressurized volumes, regolith shielding, and human factors in long-duration confinement is required."
+    },
+    {
+      "id": "mrs-nuclear-solar-power-engineer",
+      "title": "Nuclear & Solar Power Engineer",
+      "department": "Engineering",
+      "team": "Power",
+      "location": "Gale Science Station, Mars",
+      "secondary_locations": [],
+      "employment_type": "FullTime",
+      "is_remote": false,
+      "is_listed": true,
+      "published_at": "2026-02-12T00:00:00.000+00:00",
+      "updated_at": null,
+      "compensation": {
+        "compensationTierSummary": "$560K – $820K • Settler equity + hazard differential",
+        "compensationTiers": [],
+        "summaryComponents": [
+          {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 560000, "maxValue": 820000},
+          {"compensationType": "EquityPercentage", "interval": "NONE", "currencyCode": null, "minValue": null, "maxValue": null}
+        ]
+      },
+      "application_url": "https://mars-recruitment.services/careers/nuclear-solar-power-engineer/apply",
+      "job_url": "https://mars-recruitment.services/careers/nuclear-solar-power-engineer",
+      "description_html": null,
+      "description_plain": "Run the hybrid Kilopower reactor and dust-hardened solar-array grid that keeps life support, communications, and greenhouses alive through year-long dust storms. You will own reactor operations, maintenance scheduling, and the switching logic that hands generation between nuclear and solar as conditions change. Reactor operator license or Navy nuclear experience strongly preferred."
+    },
+    {
+      "id": "mrs-culinary-food-science-lead",
+      "title": "Culinary & Food Science Lead",
+      "department": "Habitability",
+      "team": "Food",
+      "location": "Utopia Planitia Settlement, Mars",
+      "secondary_locations": [],
+      "employment_type": "FullTime",
+      "is_remote": false,
+      "is_listed": true,
+      "published_at": "2026-02-18T00:00:00.000+00:00",
+      "updated_at": null,
+      "compensation": {
+        "compensationTierSummary": "$400K – $560K • Settler equity",
+        "compensationTiers": [],
+        "summaryComponents": [
+          {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 400000, "maxValue": 560000},
+          {"compensationType": "EquityPercentage", "interval": "NONE", "currencyCode": null, "minValue": null, "maxValue": null}
+        ]
+      },
+      "application_url": "https://mars-recruitment.services/careers/culinary-food-science-lead/apply",
+      "job_url": "https://mars-recruitment.services/careers/culinary-food-science-lead",
+      "description_html": null,
+      "description_plain": "Make the meals that keep settlers grounded. Combine fermentation, 3D-printed proteins, algae-based lipids, and greenhouse fresh produce into meals that taste like home, or make home feel possible. Birthday cakes matter as much as macronutrient balance. Prior fine-dining, submarine galley, or Antarctic expedition kitchen experience a strong plus."
+    }
+  ]
+}

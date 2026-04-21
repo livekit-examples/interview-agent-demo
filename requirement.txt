@@ -1,0 +1,5 @@
+livekit-agents[silero,turn-detector,simplismart,openai]~=1.5
+
+aiocsv
+python-dotenv
+

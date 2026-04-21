@@ -1,0 +1,5 @@
+.env.local
+__pycache__
+backup
+output
+reports
