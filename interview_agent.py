@@ -87,43 +87,69 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
-SIMPLISMART_BASE_URL = os.environ.get(
-    "SIMPLISMART_BASE_URL", "https://api.simplismart.live"
-)
+# Per-service endpoints + models. Defaults point at the original
+# api.simplismart.live stack; override any one via env to swap just that model.
+STT_URL = os.environ.get("STT_URL", "https://api.simplismart.live/predict")
+STT_MODEL = os.environ.get("STT_MODEL", "openai/whisper-large-v3-turbo")
+
+LLM_URL = os.environ.get("LLM_URL", "https://api.simplismart.live")
+LLM_MODEL = os.environ.get("LLM_MODEL", "meta-llama/Meta-Llama-3.1-8B-Instruct")
+
+TTS_URL = os.environ.get("TTS_URL", "https://api.simplismart.live/tts")
+TTS_MODEL = os.environ.get("TTS_MODEL", "canopylabs/orpheus-3b-0.1-ft")
+TTS_VOICE = os.environ.get("TTS_VOICE", "") or None
 
 
 def build_stt_llm_tts():
-    """Return (stt, llm, tts) instances for the chosen stack.
+    """Return (stt, llm, tts) instances using the configured endpoints.
 
+    TTS plugin is chosen by URL path:
+      * /v1/audio/speech (or …/audio/speech) → openai.TTS (OpenAI-compatible)
+      * anything else                        → simplismart.TTS (native /tts)
+    This lets you swap the TTS endpoint independently of STT/LLM.
     """
     api_key = os.environ.get("SIMPLISMART_API_KEY")
     if not api_key:
         logger.warning(
-            "the Simplismart STT/TTS and the Gemma LLM call will fail."
+            "SIMPLISMART_API_KEY not set — STT, LLM, and TTS calls will fail."
         )
-    logger.info(f"using Simplismart stack with base URL: {SIMPLISMART_BASE_URL}")
-    # Models: https://docs.simplismart.ai/training-suite/supported-models
+    logger.info(
+        "Model stack — STT: %s (%s), LLM: %s (%s), TTS: %s (%s, voice=%s)",
+        STT_URL, STT_MODEL, LLM_URL, LLM_MODEL, TTS_URL, TTS_MODEL, TTS_VOICE,
+    )
+
     stt_inst = simplismart.STT(
-        base_url=f"{SIMPLISMART_BASE_URL}/predict",
+        base_url=STT_URL,
         api_key=api_key,
-        model="openai/whisper-large-v3-turbo"
+        model=STT_MODEL,
     )
 
-    # Initialize Simplismart LLM
     llm_inst = openai.LLM(
-        #model="google/gemma-3-4b-it",
-        model="meta-llama/Meta-Llama-3.1-8B-Instruct",
+        model=LLM_MODEL,
         api_key=api_key,
-        base_url=f"{SIMPLISMART_BASE_URL}",
+        base_url=LLM_URL,
     )
-    #llm_inst =inference.LLM("openai/gpt-4.1-mini")
 
-    # Initialize Simplismart TTS (Text-to-Speech) model
-    tts_inst = simplismart.TTS(
-        base_url=f"{SIMPLISMART_BASE_URL}/tts",
-        api_key=api_key,
-        model="canopylabs/orpheus-3b-0.1-ft"
-    )
+    if TTS_URL.endswith("/audio/speech"):
+        # OpenAI-compatible endpoint: pass the URL as-is; openai.TTS will POST to it.
+        tts_kwargs: dict[str, Any] = dict(
+            model=TTS_MODEL,
+            api_key=api_key,
+            base_url=TTS_URL,
+        )
+        if TTS_VOICE:
+            tts_kwargs["voice"] = TTS_VOICE
+        tts_inst = openai.TTS(**tts_kwargs)
+    else:
+        simp_kwargs: dict[str, Any] = dict(
+            base_url=TTS_URL,
+            api_key=api_key,
+            model=TTS_MODEL,
+        )
+        if TTS_VOICE:
+            simp_kwargs["voice"] = TTS_VOICE
+        tts_inst = simplismart.TTS(**simp_kwargs)
+
     return stt_inst, llm_inst, tts_inst
 
 
