@@ -1,28 +1,32 @@
 # Mars Recruitment Services — Voice Screening Agent
 
+<img src="res/operation_settle_mars_transparent.png" width="240" alt="Operation Settle Mars">
+
+
 A LiveKit Agents demo that conducts a first-round phone screening for
 prospective Mars settlers. The agent greets the candidate, discusses
 open mission roles from the catalog, runs two short interview questions
-(background, motivation for Mars), and closes warmly.
+(background, motivation for Mars), and closes warmly. The voice loop is
+intentionally simple — a single `Agent` with one system prompt, no
+function tools, no task groups.
 
-Structured capture uses three lightweight function tools the LLM calls
-during the call — `record_candidate_name`, `record_selected_role`, and
-`record_interview_answer` (once per question, with strengths and
-concerns). After the call ends, the transcript + captured notes are
-sent to the LLM once more to produce an executive summary, a
-recommendation, and a score.
-
-Each interview produces a rich markdown report at
-`./reports/interview_<date>_<time>_<sessionId>.md` and a row appended
-to a Google Sheet.
+After the call ends, the full transcript is sent to an evaluation LLM
+once to produce a structured JSON evaluation (executive summary,
+recommendation, score, strengths/concerns, per-question notes). That
+evaluation is rendered into a rich markdown report at
+`./reports/interview_<date>_<time>_<sessionId>.md` and, if configured,
+appended as a row to a Google Sheet. The post-call pipeline lives in
+`report_gen.py` so the agent file stays focused on the voice loop.
 
 ## Project layout
 
 ```
-interview_agent.py   # the agent (entrypoint)
-google_sheets.py     # Google Sheets writer
+interview_agent.py   # the agent (entrypoint + voice loop)
+report_gen.py        # post-call transcript → evaluation → markdown + sheets
+google_sheets.py     # Google Sheets writer (service-account auth)
 mars_jobs.json       # catalog of open Mars mission roles
-reports/             # rich markdown interview reports (gitignored)
+res/                 # mission-patch image used in reports
+reports/             # generated markdown interview reports (gitignored)
 env.example          # sample .env — copy to .env.local and fill in
 ```
 
@@ -31,7 +35,10 @@ env.example          # sample .env — copy to .env.local and fill in
 - Python 3.11+ (Python 3.13 tested)
 - A LiveKit Cloud project — credentials at https://cloud.livekit.io/projects/p_/settings/keys
 - A Simplismart API key for STT / LLM / TTS — https://app.simplismart.ai/settings?tab=2
-- (Optional) `gcloud` CLI if you want to write results to a Google Sheet
+- (Optional, for Google Sheets output) A Google Cloud project you admin,
+  a service-account JSON key, and `gcloud` to set them up. See
+  [Google Sheets](#google-sheets-optional) below. The agent writes the
+  local markdown report regardless.
 
 ## Setup
 
@@ -62,24 +69,35 @@ LIVEKIT_API_SECRET=...
 ```
 
 Optional — per-service model overrides. Set only the ones you want to
-change; unset vars fall back to the defaults in `interview_agent.py`.
+change; unset vars fall back to the defaults shown below (from
+`interview_agent.py` and `report_gen.py`).
 
 ```
-# # Per-service Simplismart endpoints.
-STT_URL=https://http.at9encl1ti.ss-us-prod-01-default-westus3.azure.clusters.s9t.link/predict
+# Conversational STT / LLM / TTS (Simplismart, by default).
+STT_URL=https://api.simplismart.live/predict
 STT_MODEL=openai/whisper-large-v3-turbo
 
-LLM_URL=https://http.mgwcr8ru10-proxy.ss-us-prod-01-default-westus3.azure.clusters.s9t.link
-LLM_MODEL=google/gemma-3-4b-it
+LLM_URL=https://api.simplismart.live
+LLM_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct
 
-# # TTS uses the OpenAI-compatible /v1/audio/speech endpoint.
-#TTS_URL=https://http.yakw1y6ipy.ss-in.s9t.link/v1/audio/speech
-TTS_URL=https://http.ntrku2jcjk.ss-us-prod-01-default-westus3.azure.clusters.s9t.link/v1/audio/speech
-TTS_MODEL=qwen-tts
-TTS_VOICE=Aiden
+TTS_URL=https://api.simplismart.live/tts
+TTS_MODEL=canopylabs/orpheus-3b-0.1-ft
+TTS_VOICE=                 # optional; model-specific
 
-GOOGLE_SHEETS_SPREADSHEET_ID=   # optional, see Google Sheets section
+# Post-call evaluation LLM (independent of the conversational LLM).
+# Defaults to Simplismart's gpt-oss-120b.
+EVAL_LLM_URL=https://api.simplismart.live
+EVAL_LLM_MODEL=openai/gpt-oss-120b
+
+# Google Sheets output. Both required to write rows; see the section
+# below for setup. The agent always writes local markdown regardless.
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+GOOGLE_SHEETS_SPREADSHEET_ID=
 ```
+
+TTS plugin is selected from the URL: endpoints ending in `/audio/speech`
+go through `openai.TTS` (OpenAI-compatible); everything else uses
+`simplismart.TTS` (native `/tts`). Swap TTS stacks by flipping `TTS_URL`.
 
 ## Running
 
