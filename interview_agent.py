@@ -13,6 +13,7 @@ STT, LLM, or TTS independently via .env.local without touching this file.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -21,8 +22,9 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
+from PIL import Image
 
-from livekit import api
+from livekit import api, rtc
 from livekit.agents import (
     Agent,
     AgentServer,
@@ -50,6 +52,7 @@ load_dotenv()
 load_dotenv(HERE / ".env.local", override=True)
 
 JOBS_FILE = HERE / "mars_jobs.json"
+AGENT_LOGO_PATH = HERE / "res" / "mars_recruitment.png"
 COMPANY = "Mars Recruitment Services"
 INTERVIEWER_NAME = "Nova"
 
@@ -232,6 +235,61 @@ class InterviewAssistant(Agent):
 
 
 # ---------------------------------------------------------------------------
+# Agent video track — publish the mission patch as a static "camera" feed
+# so participants see Nova's branding in their video grid. LiveKit video
+# does not transmit alpha, so we composite the transparent PNG onto a
+# solid background first.
+# ---------------------------------------------------------------------------
+
+_LOGO_BG_COLOR = (11, 17, 38)  # dark navy to match the badge interior
+_LOGO_FPS = 5
+
+
+async def publish_agent_logo(ctx: JobContext) -> None:
+    """Publish the mission-patch image as the agent's camera track.
+
+    Pushes the same frame at ~5 fps indefinitely so late-joining
+    participants still see the badge. The frame pump runs as a task on
+    the event loop; it's cancelled automatically when the process exits.
+    """
+    if not AGENT_LOGO_PATH.exists():
+        logger.warning("agent logo not found at %s — skipping video publish", AGENT_LOGO_PATH)
+        return
+
+    # Composite onto a solid background so transparent pixels don't encode
+    # as black over the wire. Opaque images pass through this no-op.
+    img = Image.open(AGENT_LOGO_PATH).convert("RGBA")
+    bg = Image.new("RGBA", img.size, _LOGO_BG_COLOR + (255,))
+    flat = Image.alpha_composite(bg, img)
+    width, height = flat.size
+    rgba_bytes = flat.tobytes()
+
+    source = rtc.VideoSource(width, height)
+    track = rtc.LocalVideoTrack.create_video_track("mars-logo", source)
+    options = rtc.TrackPublishOptions(
+        source=rtc.TrackSource.SOURCE_CAMERA,
+        video_encoding=rtc.VideoEncoding(max_framerate=_LOGO_FPS, max_bitrate=500_000),
+        video_codec=rtc.VideoCodec.H264,
+        simulcast=False,
+    )
+    await ctx.room.local_participant.publish_track(track, options)
+    logger.info("published agent logo video track (%dx%d @ %d fps)", width, height, _LOGO_FPS)
+
+    frame = rtc.VideoFrame(width, height, rtc.VideoBufferType.RGBA, rgba_bytes)
+    interval = 1.0 / _LOGO_FPS
+
+    async def _pump() -> None:
+        try:
+            while True:
+                source.capture_frame(frame)
+                await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.create_task(_pump())
+
+
+# ---------------------------------------------------------------------------
 # Entrypoint
 # ---------------------------------------------------------------------------
 # shutdown_process_timeout default is 10s — not enough for the post-call
@@ -312,6 +370,8 @@ async def entrypoint(ctx: JobContext) -> None:
         agent=agent,
         room_options=room_io.RoomOptions(),
     )
+
+    await publish_agent_logo(ctx)
 
     await session.generate_reply(
         instructions=(

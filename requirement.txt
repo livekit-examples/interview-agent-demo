@@ -4,4 +4,5 @@ aiocsv
 python-dotenv
 gspread
 google-auth
+Pillow
 
