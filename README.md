@@ -18,8 +18,6 @@ happens post-call by re-prompting the LLM with the transcript.
 interview_agent.py   # the agent (entrypoint)
 google_sheets.py     # optional Google Sheets integration (ADC-auth)
 mars_jobs.json       # catalog of open Mars mission roles
-reports/             # per-interview markdown evaluations (gitignored)
-output/              # per-interview structured JSON (gitignored)
 env.example          # sample .env — copy to .env.local and fill in
 ```
 
@@ -62,23 +60,21 @@ Optional — per-service model overrides. Set only the ones you want to
 change; unset vars fall back to the defaults in `interview_agent.py`.
 
 ```
-STT_URL=https://api.simplismart.live/predict
+# # Per-service Simplismart endpoints.
+STT_URL=https://http.at9encl1ti.ss-us-prod-01-default-westus3.azure.clusters.s9t.link/predict
 STT_MODEL=openai/whisper-large-v3-turbo
 
-LLM_URL=https://api.simplismart.live
-LLM_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct
+LLM_URL=https://http.mgwcr8ru10-proxy.ss-us-prod-01-default-westus3.azure.clusters.s9t.link
+LLM_MODEL=google/gemma-3-4b-it
 
-TTS_URL=https://api.simplismart.live/tts
-TTS_MODEL=canopylabs/orpheus-3b-0.1-ft
-TTS_VOICE=                # optional, depends on the TTS model
+# # TTS uses the OpenAI-compatible /v1/audio/speech endpoint.
+#TTS_URL=https://http.yakw1y6ipy.ss-in.s9t.link/v1/audio/speech
+TTS_URL=https://http.ntrku2jcjk.ss-us-prod-01-default-westus3.azure.clusters.s9t.link/v1/audio/speech
+TTS_MODEL=qwen-tts
+TTS_VOICE=Aiden
 
 GOOGLE_SHEETS_SPREADSHEET_ID=   # optional, see Google Sheets section
 ```
-
-The TTS plugin is chosen from the URL: endpoints ending in
-`/audio/speech` use `openai.TTS` (OpenAI-compatible); everything else
-uses `simplismart.TTS` (native `/tts`). Switch TTS stacks just by
-flipping `TTS_URL`.
 
 ## Running
 
@@ -102,17 +98,8 @@ Production-style start (no reload):
 python interview_agent.py start
 ```
 
-Connect the test client at https://agents-playground.livekit.io/ using
-the URL + token printed on startup.
+Connect the test client at [https://agents-playground.livekit.io/](https://agents-playground.livekit.io/#cam=1&mic=1&screen=1&video=0&audio=1&chat=1&theme_color=rose) 
 
-## Outputs
-
-Every completed call writes two local files:
-
-- `output/<date>_<time>_<session_id>.json` — structured evaluation + full transcript
-- `reports/<date>_<time>_<role>_<name>.md` — human-readable markdown report
-
-Both directories are gitignored.
 
 ## Google Sheets (optional)
 
@@ -121,15 +108,9 @@ Authentication uses a **Google Cloud service account JSON key**, picked
 up automatically via `GOOGLE_APPLICATION_CREDENTIALS`. `google.auth.default()`
 detects the env var and hands the service-account credentials to gspread.
 
-> **Note:** We tried user-based ADC (`gcloud auth application-default login`)
-> first, but Google now blocks the Sheets and Drive scopes for the default
-> gcloud OAuth client. A service account avoids that and is stable for
-> headless/deployed setups too.
-
 ### One-time setup
 
-You'll need a Google Cloud project you have **admin** on — org-owned
-projects (like `livekit-cloud-site`) often won't let you enable APIs or
+You'll need a Google Cloud project you have **admin** on project to 
 create service accounts. If you don't have a personal one, create one at
 https://console.cloud.google.com/projectcreate (or reuse an existing
 personal project).
@@ -143,7 +124,7 @@ brew install --cask google-cloud-sdk
 
 gcloud auth login     # opens a browser — sign in as yourself
 gcloud projects list  # confirm your project appears
-gcloud config set project <your-project-id>   # e.g. chriswilson-geminitest
+gcloud config set project <your-project-id> 
 ```
 
 > Do **not** use the project *number* here — use the project **id**
@@ -223,9 +204,6 @@ write with columns: Timestamp, Session ID, Candidate Name, Score (1-10),
 Recommendation, Strengths, Areas for Improvement, Summary, Full
 Conversation.
 
-If Google Sheets isn't set up, the agent logs a warning and continues —
-the local JSON/markdown files in `output/` and `reports/` are always
-written.
 
 ### Troubleshooting
 
@@ -249,9 +227,6 @@ restart the agent. Each service is independent. The post-call
 evaluation uses `LLM_URL` + `LLM_MODEL`, so swapping the LLM swaps
 both the conversation and the evaluation.
 
-If you need a model that isn't OpenAI-compatible, you'll have to edit
-`build_stt_llm_tts()` in `interview_agent.py` to use a different
-plugin.
 
 ## LiveKit docs
 

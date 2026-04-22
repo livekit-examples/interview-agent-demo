@@ -17,7 +17,6 @@ import json
 import logging
 import os
 import re
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -52,8 +51,6 @@ load_dotenv()
 load_dotenv(HERE / ".env.local", override=True)
 
 JOBS_FILE = HERE / "mars_jobs.json"
-REPORTS_DIR = HERE / "reports"
-OUTPUT_DIR = HERE / "output"
 COMPANY = "Mars Recruitment Services"
 INTERVIEWER_NAME = "Nova"
 
@@ -317,93 +314,6 @@ async def _evaluate_candidate(transcript: str) -> dict[str, Any]:
         return {}
 
 
-def _slug(s: str, max_len: int = 40) -> str:
-    s = re.sub(r"[^A-Za-z0-9]+", "-", s or "").strip("-")
-    return (s[:max_len] or "candidate").lower()
-
-
-def _render_markdown_report(evaluation: dict[str, Any], transcript: str) -> str:
-    name = evaluation.get("candidate_name") or "Unknown"
-    role = evaluation.get("selected_role") or "Unknown"
-    score = evaluation.get("score", "n/a")
-    rec = evaluation.get("recommendation", "n/a")
-    now = datetime.now().strftime("%B %d, %Y")
-
-    parts = [
-        f"# Candidate Evaluation — {name}",
-        "",
-        "| Field | Value |",
-        "| --- | --- |",
-        f"| Candidate | {name} |",
-        f"| Role | {role} |",
-        f"| Date | {now} |",
-        f"| Score | {score}/10 |",
-        f"| Recommendation | {rec} |",
-        "",
-        "## Summary",
-        str(evaluation.get("summary") or "(not provided)"),
-        "",
-        "## Strengths",
-        str(evaluation.get("strengths") or "(none noted)"),
-        "",
-        "## Areas for improvement",
-        str(evaluation.get("areas_for_improvement") or "(none noted)"),
-        "",
-        "## Motivation assessment",
-        str(evaluation.get("motivation_assessment") or "(not provided)"),
-        "",
-        "## Transcript",
-        "```",
-        transcript or "(empty)",
-        "```",
-    ]
-    return "\n".join(parts)
-
-
-def save_results(
-    session_id: str,
-    evaluation: dict[str, Any],
-    transcript: str,
-) -> tuple[Path | None, Path | None]:
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    stamp_file = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    sid = re.sub(r"[^\w.\-]+", "_", (session_id or "unknown").strip())
-
-    payload = {
-        "recorded_at": datetime.now().isoformat(timespec="seconds"),
-        "session_id": session_id,
-        "evaluation": evaluation,
-        "transcript": transcript,
-    }
-    json_path = OUTPUT_DIR / f"{stamp_file}_{sid}.json"
-    try:
-        json_path.write_text(
-            json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-        logger.info("saved evaluation JSON to %s", json_path)
-    except Exception:
-        logger.exception("failed to save evaluation JSON")
-        json_path = None
-
-    name = _slug(evaluation.get("candidate_name") or "unknown")
-    role = _slug(evaluation.get("selected_role") or "role")
-    md_path = REPORTS_DIR / f"{stamp_file}_{role}_{name}.md"
-    try:
-        md_path.write_text(
-            _render_markdown_report(evaluation, transcript),
-            encoding="utf-8",
-        )
-        logger.info("saved evaluation report to %s", md_path)
-    except Exception:
-        logger.exception("failed to save evaluation markdown")
-        md_path = None
-
-    return md_path, json_path
-
-
 async def on_session_close(session: AgentSession, session_id: str) -> None:
     logger.info("session '%s' closed — running post-interview evaluation", session_id)
     transcript = _build_transcript(session)
@@ -423,13 +333,15 @@ async def on_session_close(session: AgentSession, session_id: str) -> None:
             "motivation_assessment": "",
             "summary": "Evaluation could not be generated.",
         }
-    save_results(session_id, evaluation, transcript)
 
-    # Google Sheets save (key expected by google_sheets.py is conversation_transcript)
-    if sheets_service.worksheet is not None:
-        evaluation_for_sheet = dict(evaluation)
-        evaluation_for_sheet["conversation_transcript"] = transcript
-        await sheets_service.save_interview_result(session_id, evaluation_for_sheet)
+    if sheets_service.worksheet is None:
+        logger.warning(
+            "Google Sheets not initialized — dropping evaluation (no local save configured)"
+        )
+        return
+
+    evaluation["conversation_transcript"] = transcript
+    await sheets_service.save_interview_result(session_id, evaluation)
 
 
 # ---------------------------------------------------------------------------
