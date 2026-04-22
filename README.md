@@ -50,7 +50,7 @@ env.example          # sample .env — copy to .env.local and fill in
 python -m venv .venv
 source .venv/bin/activate
 pip install -U pip
-pip install -r requirement.txt
+pip install -r requirements.txt
 ```
 
 ### 2. Environment variables

@@ -300,8 +300,8 @@ def prewarm(proc: JobProcess) -> None:
     proc.userdata["vad"] = silero.VAD.load()
 
 
-@server.rtc_session()
-#@server.rtc_session(agent_name="mars-recruiter")
+#@server.rtc_session()
+@server.rtc_session(agent_name="mars-recruiter")
 async def entrypoint(ctx: JobContext) -> None:
     ctx.log_context_fields = {"room": ctx.room.name}
     logger.info("starting agent in room %s", ctx.room.name)
