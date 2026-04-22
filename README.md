@@ -1,10 +1,12 @@
 # Mars Recruitment Services — Voice Screening Agent
 
-<img src="res/operation_settle_mars_transparent.png" width="240" alt="Operation Settle Mars">
+<img src="res/screenshot.png" width="640" alt="Operation Settle Mars">
 
+
+---
 
 A LiveKit Agents demo that conducts a first-round phone screening for
-prospective Mars settlers. The agent greets the candidate, discusses
+prospective Mars settlers using Simplismart inference. The agent greets the candidate, discusses
 open mission roles from the catalog, runs two short interview questions
 (background, motivation for Mars), and closes warmly. The voice loop is
 intentionally simple — a single `Agent` with one system prompt, no
