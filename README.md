@@ -1,6 +1,6 @@
 # Mars Recruitment Services — Voice Screening Agent
 
-<img src="res/screenshot.png" width="640" alt="Operation Settle Mars">
+<img src="res/screenshot.png" alt="Operation Settle Mars">
 
 
 ---
@@ -35,8 +35,9 @@ env.example          # sample .env — copy to .env.local and fill in
 ## Prerequisites
 
 - Python 3.11+ (Python 3.13 tested)
-- A LiveKit Cloud project — credentials at https://cloud.livekit.io/projects/p_/settings/keys
-- A Simplismart API key for STT / LLM / TTS — https://app.simplismart.ai/settings?tab=2
+- LiveKit Agents `>=1.5.6`
+- A LiveKit Cloud project — credentials at [https://cloud.livekit.io/projects/p_/settings/keys](https://cloud.livekit.io/projects/p_/settings/keys)
+- A Simplismart API key for STT / LLM / TTS — [https://app.simplismart.ai/settings?tab=2](https://app.simplismart.ai/settings?tab=2)
 - (Optional, for Google Sheets output) A Google Cloud project you admin,
   a service-account JSON key, and `gcloud` to set them up. See
   [Google Sheets](#google-sheets-optional) below. The agent writes the
@@ -50,7 +51,7 @@ env.example          # sample .env — copy to .env.local and fill in
 python -m venv .venv
 source .venv/bin/activate
 pip install -U pip
-pip install -r requirement.txt
+pip install -r requirements.txt
 ```
 
 ### 2. Environment variables
@@ -124,6 +125,39 @@ python interview_agent.py start
 ```
 
 Connect the test client at [https://agents-playground.livekit.io/](https://agents-playground.livekit.io/#cam=1&mic=1&screen=1&video=0&audio=1&chat=1&theme_color=rose) 
+
+
+## Deploying to LiveKit Cloud (optional)
+
+To run this agent on LiveKit Cloud instead of from your laptop, see the
+[deploy quickstart](https://docs.livekit.io/deploy/agents/quickstart/)
+for the full walkthrough. The short version, from this project's root:
+
+1. [Install](https://docs.livekit.io/reference/developer-tools/livekit-cli/)
+   the `lk` CLI and authenticate it against your Cloud project:
+
+   ```bash
+   lk cloud auth
+   ```
+
+2. Register and deploy the agent. The first run generates `livekit.toml`
+   and `Dockerfile` if they aren't already in the repo:
+
+   ```bash
+   lk agent create
+   ```
+
+3. For subsequent updates, push new versions with:
+
+   ```bash
+   lk agent deploy
+   ```
+
+Your local `.env.local` isn't uploaded automatically — set
+`SIMPLISMART_API_KEY`, `EVAL_LLM_*`, and the Google Sheets pair on the
+deployed agent via `lk agent env` (or the Cloud console) before it
+will run end-to-end. `LIVEKIT_URL` / `LIVEKIT_API_KEY` /
+`LIVEKIT_API_SECRET` are injected automatically by Cloud.
 
 
 ## Google Sheets (optional)
