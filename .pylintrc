@@ -1,0 +1,5 @@
+[MESSAGES CONTROL]
+# W1203: logging-fstring-interpolation — f-strings in logging calls are fine in this project.
+# C0116: missing-function-docstring — not every function needs a docstring.
+disable=logging-fstring-interpolation,
+        missing-function-docstring
