@@ -429,6 +429,8 @@ def _render_markdown_report(
     parts: list[str] = []
     parts.append(f"# Candidate Evaluation — {name}")
     parts.append("")
+    parts.append("<img src=\"../res/operation_settle_mars_transparent.png\" width=\"240\" alt=\"Operation Settle Mars\">")
+    parts.append("")
     parts.append("## Executive summary")
     parts.append(str(evaluation.get("summary") or "(not generated)"))
     parts.append("")
