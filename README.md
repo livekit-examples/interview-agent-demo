@@ -133,6 +133,8 @@ To run this agent on LiveKit Cloud instead of from your laptop, see the
 [deploy quickstart](https://docs.livekit.io/deploy/agents/quickstart/)
 for the full walkthrough. The short version, from this project's root:
 
+In your code change `@server.rtc_session()` to use explicit dispatch `@server.rtc_session(agent_name="mars-recruiter")`.
+
 1. [Install](https://docs.livekit.io/reference/developer-tools/livekit-cli/)
    the `lk` CLI and authenticate it against your Cloud project:
 
