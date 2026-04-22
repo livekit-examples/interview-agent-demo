@@ -37,7 +37,6 @@ from livekit.agents import (
     JobProcess,
     TurnHandlingOptions,
     cli,
-    inference,
     llm,
     room_io,
     text_transforms,
@@ -77,10 +76,10 @@ TTS_URL = os.environ.get("TTS_URL", "https://api.simplismart.live/tts")
 TTS_MODEL = os.environ.get("TTS_MODEL", "canopylabs/orpheus-3b-0.1-ft")
 TTS_VOICE = os.environ.get("TTS_VOICE", "") or None
 
-# Post-call evaluation runs through LiveKit Inference (no Simplismart
-# dependency) so the structured JSON + markdown report doesn't depend on
-# whatever model drives the conversation.
-EVALUATION_LLM_MODEL = os.environ.get("EVALUATION_LLM_MODEL", "openai/gpt-4.1-mini")
+# Post-call evaluation LLM. Always an OpenAI-compatible endpoint
+# (defaults to Simplismart's gpt-oss-120b). Override either via .env.local.
+EVAL_LLM_URL = os.environ.get("EVAL_LLM_URL", "https://api.simplismart.live")
+EVAL_LLM_MODEL = os.environ.get("EVAL_LLM_MODEL", "openai/gpt-oss-120b")
 
 
 def build_stt_llm_tts():
@@ -229,17 +228,17 @@ MISSION ROLE CATALOG:
 """.strip()
 
 
-EVALUATION_PROMPT_TEMPLATE = f"""
-You are an expert recruiter at {COMPANY}. Below is the full transcript of
-a first-round phone screening interview for a Mars settler role.
-Evaluate the candidate strictly based on what was said in the transcript.
+EVALUATION_SYSTEM_PROMPT = f"""
+You are an expert recruiter at {COMPANY} producing a written evaluation
+of a first-round phone screening interview for a Mars settler role.
+Evaluate the candidate strictly based on what was said in the transcript
+provided in the next message.
 
-TRANSCRIPT:
-{{transcript}}
+Respond with ONLY a single JSON object — no prose, no markdown code
+fences, no commentary before or after. The JSON must have exactly these
+keys:
 
-Produce a JSON object with exactly these keys (no extra keys, no
-markdown code fences):
-{{{{
+{{
   "candidate_name": "<first name from the transcript, or 'Unknown'>",
   "selected_role": "<the mission role they chose, or 'Unknown'>",
   "selection_notes": "<1-2 sentences summarizing what the candidate said about their interests / why this role>",
@@ -250,27 +249,30 @@ markdown code fences):
   "motivation_assessment": "<2-3 sentences on motivation and commitment to a multi-year Mars deployment>",
   "summary": "<3-5 sentence overall assessment for the mission selection board>",
   "answers": [
-    {{{{
+    {{
       "topic": "<short topic label, e.g. 'Background' or 'Motivation for Mars'>",
       "question_asked": "<the exact question the interviewer asked>",
       "response_summary": "<1-2 sentence neutral summary of the candidate's answer>",
       "strengths": "<specific strengths cited from the answer, or empty string>",
       "concerns": "<specific concerns or gaps, or empty string>"
-    }}}}
+    }}
   ]
-}}}}
+}}
 
 The "answers" array should contain one entry per interview question
 actually asked and answered in the transcript (typically two).
 
 SCORING RUBRIC:
-8-10 → Strong fit, proceed to next round
-5-7  → Mixed signals, on hold / needs further assessment
-1-4  → Poor fit or insufficient information, reject
-
-Return ONLY the raw JSON object. Do not include any explanation outside
-the JSON.
+- 8-10 → Strong fit, proceed to next round
+- 5-7  → Mixed signals, on hold / needs further assessment
+- 1-4  → Poor fit or insufficient information, reject
 """.strip()
+
+
+EVALUATION_USER_PROMPT_TEMPLATE = (
+    "Transcript of the screening interview:\n\n{transcript}\n\n"
+    "Now produce the JSON evaluation."
+)
 
 
 # ---------------------------------------------------------------------------
@@ -345,20 +347,58 @@ def _build_transcript(session: AgentSession) -> str:
     return "\n".join(lines)
 
 
-async def _evaluate_candidate(transcript: str) -> tuple[dict[str, Any], str]:
-    """Run the evaluation LLM. Returns (evaluation_dict, error_reason).
+async def _run_eval_llm(
+    provider_label: str,
+    llm_inst: llm.LLM,
+    transcript: str,
+) -> tuple[dict[str, Any], str]:
+    """One attempt at the evaluation LLM. Returns (evaluation, error_reason)."""
+    chat_ctx = llm.ChatContext()
+    chat_ctx.add_message(role="system", content=EVALUATION_SYSTEM_PROMPT)
+    chat_ctx.add_message(
+        role="user",
+        content=EVALUATION_USER_PROMPT_TEMPLATE.format(transcript=transcript),
+    )
+    try:
+        chunks: list[str] = []
+        async for chunk in llm_inst.chat(chat_ctx=chat_ctx):
+            if chunk.delta and chunk.delta.content:
+                chunks.append(chunk.delta.content)
+        result_text = "".join(chunks).strip()
+    except Exception as e:
+        logger.error("%s evaluation call raised %s: %s", provider_label, type(e).__name__, e)
+        return {}, f"{provider_label} raised {type(e).__name__}: {e}"
 
-    evaluation_dict is empty on failure. error_reason is "" on success,
-    or a short human-readable string describing why evaluation failed —
-    useful for surfacing the cause in the fallback report.
-    """
+    if not result_text:
+        logger.error("%s evaluation returned empty response", provider_label)
+        return {}, f"{provider_label} returned empty response."
+
+    cleaned = re.sub(r"```(?:json)?\s*", "", result_text).strip()
+    json_match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    if not json_match:
+        logger.error(
+            "%s evaluation response had no JSON; first 500 chars: %s",
+            provider_label, result_text[:500],
+        )
+        return {}, f"{provider_label} response did not contain JSON."
+
+    try:
+        return json.loads(json_match.group()), ""
+    except json.JSONDecodeError as e:
+        logger.error(
+            "%s evaluation JSON parse failed: %s; first 500 chars: %s",
+            provider_label, e, json_match.group()[:500],
+        )
+        return {}, f"{provider_label} JSON failed to parse: {e}"
+
+
+async def _evaluate_candidate(transcript: str) -> tuple[dict[str, Any], str]:
+    """Evaluate the transcript via EVAL_LLM_URL / EVAL_LLM_MODEL."""
     if not transcript.strip():
         logger.warning("empty transcript — skipping evaluation")
         return {}, "Empty transcript — the session ended before anything was said."
 
-    # Short transcripts aren't worth a full evaluation call — the LLM will
-    # just return empty "Unknown" fields anyway. Short-circuit with a clear
-    # note explaining what happened.
+    # Short transcripts aren't worth a full evaluation call.
     turn_count = sum(1 for line in transcript.splitlines() if line.strip())
     if len(transcript) < 200 or turn_count < 3:
         msg = (
@@ -369,40 +409,21 @@ async def _evaluate_candidate(transcript: str) -> tuple[dict[str, Any], str]:
         logger.warning(msg)
         return {}, msg
 
-    prompt = EVALUATION_PROMPT_TEMPLATE.format(transcript=transcript)
+    provider = f"'{EVAL_LLM_MODEL}' ({EVAL_LLM_URL})"
     logger.info(
-        "sending transcript to LiveKit Inference '%s' for evaluation (%d chars)",
-        EVALUATION_LLM_MODEL, len(transcript),
+        "sending transcript to %s for evaluation (%d chars)",
+        provider, len(transcript),
     )
-
     try:
-        eval_llm = inference.LLM(EVALUATION_LLM_MODEL)
-        chat_ctx = llm.ChatContext()
-        chat_ctx.add_message(role="user", content=prompt)
-        chunks: list[str] = []
-        async for chunk in eval_llm.chat(chat_ctx=chat_ctx):
-            if chunk.delta and chunk.delta.content:
-                chunks.append(chunk.delta.content)
-        result_text = "".join(chunks).strip()
+        eval_llm = openai.LLM(
+            model=EVAL_LLM_MODEL,
+            api_key=SIMPLISMART_API_KEY,
+            base_url=EVAL_LLM_URL,
+        )
     except Exception as e:
-        logger.error("evaluation LLM call failed: %s", e, exc_info=True)
-        return {}, f"Evaluation LLM call raised {type(e).__name__}: {e}"
-
-    if not result_text:
-        logger.error("evaluation LLM returned empty response")
-        return {}, "Evaluation LLM returned empty response."
-
-    cleaned = re.sub(r"```(?:json)?\s*", "", result_text).strip()
-    json_match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-    if not json_match:
-        logger.error("no JSON object found in evaluation response: %s", result_text[:500])
-        return {}, "Evaluation LLM response did not contain JSON."
-
-    try:
-        return json.loads(json_match.group()), ""
-    except json.JSONDecodeError as e:
-        logger.error("failed to parse evaluation JSON: %s; raw: %s", e, json_match.group()[:500])
-        return {}, f"Evaluation JSON failed to parse: {e}"
+        logger.error("failed to construct eval LLM: %s", e, exc_info=True)
+        return {}, f"{provider} setup failed: {e}"
+    return await _run_eval_llm(provider, eval_llm, transcript)
 
 
 def _slug(s: str, max_len: int = 40) -> str:

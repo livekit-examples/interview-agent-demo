@@ -235,11 +235,16 @@ Change one `*_URL` / `*_MODEL` / `*_VOICE` line in `.env.local` and
 restart the agent. Each service is independent.
 
 The **conversational** LLM (`LLM_URL` + `LLM_MODEL`) is Simplismart by
-default, which prioritizes latency. The **post-call evaluation** runs
-through LiveKit Inference (`EVALUATION_LLM_MODEL`, default
-`openai/gpt-4.1-mini`) — it's a single JSON-producing call with no
-latency budget, so we want the more capable model. Changing one does
-not affect the other.
+default, which prioritizes latency.
+
+The **post-call evaluation** LLM (`EVAL_LLM_URL` + `EVAL_LLM_MODEL`) is
+independent and defaults to Simplismart's `openai/gpt-oss-120b` at
+`https://api.simplismart.live`. Override either env var in `.env.local`
+to point at a different OpenAI-compatible endpoint/model. Uses
+`SIMPLISMART_API_KEY`. No latency constraint here, so using a bigger
+model than the conversational one is fine.
+
+Changing one LLM does not affect the other.
 
 
 ## LiveKit docs
