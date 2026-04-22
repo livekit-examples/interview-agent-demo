@@ -103,24 +103,14 @@ def build_stt_llm_tts():
         base_url=LLM_URL,
     )
 
-    if TTS_URL.endswith("/audio/speech"):
-        tts_kwargs: dict[str, Any] = dict(
-            model=TTS_MODEL,
-            api_key=SIMPLISMART_API_KEY,
-            base_url=TTS_URL,
-        )
-        if TTS_VOICE:
-            tts_kwargs["voice"] = TTS_VOICE
-        tts_inst = openai.TTS(**tts_kwargs)
-    else:
-        simp_kwargs: dict[str, Any] = dict(
-            base_url=TTS_URL,
-            api_key=SIMPLISMART_API_KEY,
-            model=TTS_MODEL,
-        )
-        if TTS_VOICE:
-            simp_kwargs["voice"] = TTS_VOICE
-        tts_inst = simplismart.TTS(**simp_kwargs)
+    tts_kwargs: dict[str, Any] = dict(
+        model=TTS_MODEL,
+        api_key=SIMPLISMART_API_KEY,
+        base_url=TTS_URL,
+    )
+    if TTS_VOICE:
+        tts_kwargs["voice"] = TTS_VOICE
+    tts_inst = simplismart.TTS(**tts_kwargs)
 
     return stt_inst, llm_inst, tts_inst
 
