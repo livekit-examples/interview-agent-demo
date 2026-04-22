@@ -232,9 +232,14 @@ Conversation.
 ## Swapping models
 
 Change one `*_URL` / `*_MODEL` / `*_VOICE` line in `.env.local` and
-restart the agent. Each service is independent. The post-call
-evaluation uses `LLM_URL` + `LLM_MODEL`, so swapping the LLM swaps
-both the conversation and the evaluation.
+restart the agent. Each service is independent.
+
+The **conversational** LLM (`LLM_URL` + `LLM_MODEL`) is Simplismart by
+default, which prioritizes latency. The **post-call evaluation** runs
+through LiveKit Inference (`EVALUATION_LLM_MODEL`, default
+`openai/gpt-4.1-mini`) — it's a single JSON-producing call with no
+latency budget, so we want the more capable model. Changing one does
+not affect the other.
 
 
 ## LiveKit docs

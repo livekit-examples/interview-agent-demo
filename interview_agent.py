@@ -2,12 +2,13 @@
 Mars Recruitment Services — Settler Screening Agent.
 
 A prompt-driven voice agent that screens candidates for open Mars settler
-roles. During the call, the agent uses three lightweight function tools
-to capture canonical state: candidate name, confirmed role, and per-question
-evaluation notes. After the call ends, the full transcript is sent to an
-LLM once more to produce an executive summary, a recommendation, and a
-score. Everything is rendered into a rich markdown report under ./reports/
-and also appended as a row to a Google Sheet.
+roles. No mid-call function tools — small open-source LLMs (Llama 3.1 8B,
+Gemma 3 4B) tend to crash their serving proxies on tool-call continuation
+turns, so all structured capture happens post-call. After the call ends
+the full transcript is sent to the LLM once to produce a rich JSON
+evaluation: executive summary, recommendation, score, per-question notes,
+and strengths/concerns. That evaluation is rendered into a markdown
+report under ./reports/ and appended as a row to a Google Sheet.
 
 Model stack is env-driven (per-service URLs + model names) so you can swap
 STT, LLM, or TTS independently via .env.local without touching this file.
@@ -25,7 +26,6 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
 
 from livekit import api
 from livekit.agents import (
@@ -35,16 +35,13 @@ from livekit.agents import (
     ConversationItemAddedEvent,
     JobContext,
     JobProcess,
-    RunContext,
-    SessionUsageUpdatedEvent,
     TurnHandlingOptions,
-    WorkerOptions,
     cli,
+    inference,
     llm,
     room_io,
     text_transforms,
 )
-from livekit.agents.llm import function_tool
 from livekit.plugins import openai, silero, simplismart
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
@@ -79,6 +76,11 @@ LLM_MODEL = os.environ.get("LLM_MODEL", "meta-llama/Meta-Llama-3.1-8B-Instruct")
 TTS_URL = os.environ.get("TTS_URL", "https://api.simplismart.live/tts")
 TTS_MODEL = os.environ.get("TTS_MODEL", "canopylabs/orpheus-3b-0.1-ft")
 TTS_VOICE = os.environ.get("TTS_VOICE", "") or None
+
+# Post-call evaluation runs through LiveKit Inference (no Simplismart
+# dependency) so the structured JSON + markdown report doesn't depend on
+# whatever model drives the conversation.
+EVALUATION_LLM_MODEL = os.environ.get("EVALUATION_LLM_MODEL", "openai/gpt-4.1-mini")
 
 
 def build_stt_llm_tts():
@@ -222,19 +224,6 @@ GUIDELINES:
 - If the candidate clearly asks to end the call early, thank them, wrap
   up warmly, and stop asking further questions.
 
-TOOL USE (internal — these capture notes for the selection board, never
-speak the tool names or their contents aloud):
-- As soon as the candidate states their first name, call
-  `record_candidate_name`.
-- As soon as the candidate confirms which mission role they want to be
-  considered for, call `record_selected_role` with the exact role title
-  and a short note summarizing their stated interests.
-- After each of the two interview questions — once you've gathered
-  enough to evaluate the answer — call `record_interview_answer` with
-  the topic label, the exact question you asked, a neutral 1–2 sentence
-  summary of their response, specific strengths, and specific concerns.
-  These notes are not shared with the candidate.
-
 MISSION ROLE CATALOG:
 {{job_catalog}}
 """.strip()
@@ -251,15 +240,28 @@ TRANSCRIPT:
 Produce a JSON object with exactly these keys (no extra keys, no
 markdown code fences):
 {{{{
-  "candidate_name": "<first name extracted from transcript, or 'Unknown'>",
-  "selected_role": "<the mission role they chose, as stated in the transcript, or 'Unknown'>",
+  "candidate_name": "<first name from the transcript, or 'Unknown'>",
+  "selected_role": "<the mission role they chose, or 'Unknown'>",
+  "selection_notes": "<1-2 sentences summarizing what the candidate said about their interests / why this role>",
   "score": <integer 1-10 reflecting overall suitability>,
   "recommendation": "<one of: Proceed | On Hold | Reject>",
-  "strengths": "<2-4 sentence summary of the candidate's strongest points, citing specifics>",
+  "strengths": "<2-4 sentence summary of strongest points, citing specifics>",
   "areas_for_improvement": "<2-4 sentence summary of gaps, concerns, or red flags>",
-  "motivation_assessment": "<2-3 sentences on the candidate's motivation and commitment to a multi-year Mars deployment>",
-  "summary": "<3-5 sentence overall assessment suitable for the mission selection board>"
+  "motivation_assessment": "<2-3 sentences on motivation and commitment to a multi-year Mars deployment>",
+  "summary": "<3-5 sentence overall assessment for the mission selection board>",
+  "answers": [
+    {{{{
+      "topic": "<short topic label, e.g. 'Background' or 'Motivation for Mars'>",
+      "question_asked": "<the exact question the interviewer asked>",
+      "response_summary": "<1-2 sentence neutral summary of the candidate's answer>",
+      "strengths": "<specific strengths cited from the answer, or empty string>",
+      "concerns": "<specific concerns or gaps, or empty string>"
+    }}}}
+  ]
 }}}}
+
+The "answers" array should contain one entry per interview question
+actually asked and answered in the transcript (typically two).
 
 SCORING RUBRIC:
 8-10 → Strong fit, proceed to next round
@@ -293,88 +295,36 @@ class CapturedState:
     answers: list[CapturedAnswer] = field(default_factory=list)
 
 
+def state_from_evaluation(evaluation: dict[str, Any]) -> CapturedState:
+    """Populate a CapturedState from the post-call evaluation JSON."""
+    answers_raw = evaluation.get("answers") or []
+    answers: list[CapturedAnswer] = []
+    for a in answers_raw:
+        if not isinstance(a, dict):
+            continue
+        answers.append(
+            CapturedAnswer(
+                topic=str(a.get("topic") or "").strip() or "Untitled",
+                question_asked=str(a.get("question_asked") or "").strip(),
+                response_summary=str(a.get("response_summary") or "").strip(),
+                strengths=str(a.get("strengths") or "").strip(),
+                concerns=str(a.get("concerns") or "").strip(),
+            )
+        )
+    return CapturedState(
+        candidate_name=str(evaluation.get("candidate_name") or "").strip(),
+        selected_role=str(evaluation.get("selected_role") or "").strip(),
+        selection_notes=str(evaluation.get("selection_notes") or "").strip(),
+        answers=answers,
+    )
+
+
 class InterviewAssistant(Agent):
     def __init__(self, jobs: list[dict[str, Any]]) -> None:
         prompt = INTERVIEW_PROMPT_TEMPLATE.format(
             job_catalog=format_jobs_for_prompt(jobs)
         )
         super().__init__(instructions=prompt)
-        self.state = CapturedState()
-
-    @function_tool()
-    async def record_candidate_name(self, context: RunContext, name: str) -> str:
-        """Record the candidate's first name once they've said it aloud.
-
-        Args:
-            name: The candidate's first name as they introduced themselves.
-        """
-        name = (name or "").strip()
-        if not name:
-            return "No name captured."
-        self.state.candidate_name = name
-        logger.info("tool record_candidate_name: %s", name)
-        return "Noted."
-
-    @function_tool()
-    async def record_selected_role(
-        self,
-        context: RunContext,
-        title: str,
-        interests_notes: str = "",
-    ) -> str:
-        """Record the mission role the candidate has confirmed interest in.
-
-        Args:
-            title: The role title, ideally as listed in the mission catalog.
-            interests_notes: Short summary of what they said about their
-                interests, background, or preferences relevant to the role.
-        """
-        title = (title or "").strip()
-        if not title:
-            return "No role captured."
-        self.state.selected_role = title
-        self.state.selection_notes = (interests_notes or "").strip()
-        logger.info("tool record_selected_role: %s", title)
-        return "Noted."
-
-    @function_tool()
-    async def record_interview_answer(
-        self,
-        context: RunContext,
-        topic: str,
-        question_asked: str,
-        response_summary: str,
-        strengths: str = "",
-        concerns: str = "",
-    ) -> str:
-        """Record an internal evaluation of one interview answer.
-
-        Call this once after each of the two interview questions, when
-        you have enough signal to evaluate the answer. The notes feed
-        directly into the mission selection board's report — be
-        specific and evidence-based. Never speak these notes aloud.
-
-        Args:
-            topic: Short topic label, e.g. "Background" or "Motivation".
-            question_asked: The exact question you ended up asking,
-                tailored to the role.
-            response_summary: 1–2 sentence neutral summary of what the
-                candidate said in response.
-            strengths: Specific strengths, citing what they said.
-                Empty string if nothing particularly strong.
-            concerns: Specific gaps, red flags, or weak reasoning.
-                Empty string if no concerns.
-        """
-        entry = CapturedAnswer(
-            topic=(topic or "").strip() or "Untitled",
-            question_asked=(question_asked or "").strip(),
-            response_summary=(response_summary or "").strip(),
-            strengths=(strengths or "").strip(),
-            concerns=(concerns or "").strip(),
-        )
-        self.state.answers.append(entry)
-        logger.info("tool record_interview_answer: topic=%s", entry.topic)
-        return "Noted."
 
 
 # ---------------------------------------------------------------------------
@@ -395,37 +345,64 @@ def _build_transcript(session: AgentSession) -> str:
     return "\n".join(lines)
 
 
-async def _evaluate_candidate(transcript: str) -> dict[str, Any]:
+async def _evaluate_candidate(transcript: str) -> tuple[dict[str, Any], str]:
+    """Run the evaluation LLM. Returns (evaluation_dict, error_reason).
+
+    evaluation_dict is empty on failure. error_reason is "" on success,
+    or a short human-readable string describing why evaluation failed —
+    useful for surfacing the cause in the fallback report.
+    """
     if not transcript.strip():
         logger.warning("empty transcript — skipping evaluation")
-        return {}
+        return {}, "Empty transcript — the session ended before anything was said."
+
+    # Short transcripts aren't worth a full evaluation call — the LLM will
+    # just return empty "Unknown" fields anyway. Short-circuit with a clear
+    # note explaining what happened.
+    turn_count = sum(1 for line in transcript.splitlines() if line.strip())
+    if len(transcript) < 200 or turn_count < 3:
+        msg = (
+            f"Transcript too short to evaluate "
+            f"({len(transcript)} chars, {turn_count} turn(s)). "
+            "The candidate likely disconnected before the screening began."
+        )
+        logger.warning(msg)
+        return {}, msg
 
     prompt = EVALUATION_PROMPT_TEMPLATE.format(transcript=transcript)
-    logger.info("sending transcript to LLM for evaluation (%d chars)", len(transcript))
+    logger.info(
+        "sending transcript to LiveKit Inference '%s' for evaluation (%d chars)",
+        EVALUATION_LLM_MODEL, len(transcript),
+    )
 
     try:
-        client = AsyncOpenAI(api_key=SIMPLISMART_API_KEY, base_url=LLM_URL)
-        response = await client.chat.completions.create(
-            model=LLM_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-        )
-        result_text = response.choices[0].message.content or ""
+        eval_llm = inference.LLM(EVALUATION_LLM_MODEL)
+        chat_ctx = llm.ChatContext()
+        chat_ctx.add_message(role="user", content=prompt)
+        chunks: list[str] = []
+        async for chunk in eval_llm.chat(chat_ctx=chat_ctx):
+            if chunk.delta and chunk.delta.content:
+                chunks.append(chunk.delta.content)
+        result_text = "".join(chunks).strip()
     except Exception as e:
         logger.error("evaluation LLM call failed: %s", e, exc_info=True)
-        return {}
+        return {}, f"Evaluation LLM call raised {type(e).__name__}: {e}"
+
+    if not result_text:
+        logger.error("evaluation LLM returned empty response")
+        return {}, "Evaluation LLM returned empty response."
 
     cleaned = re.sub(r"```(?:json)?\s*", "", result_text).strip()
     json_match = re.search(r"\{.*\}", cleaned, re.DOTALL)
     if not json_match:
         logger.error("no JSON object found in evaluation response: %s", result_text[:500])
-        return {}
+        return {}, "Evaluation LLM response did not contain JSON."
 
     try:
-        return json.loads(json_match.group())
+        return json.loads(json_match.group()), ""
     except json.JSONDecodeError as e:
-        logger.error("failed to parse evaluation JSON: %s", e)
-        return {}
+        logger.error("failed to parse evaluation JSON: %s; raw: %s", e, json_match.group()[:500])
+        return {}, f"Evaluation JSON failed to parse: {e}"
 
 
 def _slug(s: str, max_len: int = 40) -> str:
@@ -501,8 +478,9 @@ def _render_markdown_report(
                 parts.append("")
     else:
         parts.append(
-            "_No per-question notes were captured via `record_interview_answer` "
-            "during this call. See transcript below for the raw exchange._"
+            "_No per-question evaluation was produced — either the call "
+            "ended before the interview questions, or the evaluation LLM "
+            "did not return `answers`. See the transcript below._"
         )
         parts.append("")
 
@@ -535,29 +513,31 @@ def save_report(
 
 async def on_session_close(
     session: AgentSession,
-    agent: InterviewAssistant,
     session_id: str,
 ) -> None:
     logger.info("session '%s' closed — running post-interview evaluation", session_id)
     transcript = _build_transcript(session)
-    state = agent.state
 
     if not transcript:
         logger.warning("no transcript captured — nothing to evaluate")
         return
 
-    evaluation = await _evaluate_candidate(transcript)
+    evaluation, error_reason = await _evaluate_candidate(transcript)
     if not evaluation:
         evaluation = {
-            "candidate_name": state.candidate_name or "Unknown",
-            "selected_role": state.selected_role or "Unknown",
+            "candidate_name": "Unknown",
+            "selected_role": "Unknown",
+            "selection_notes": "",
             "score": "",
             "recommendation": "",
             "strengths": "",
             "areas_for_improvement": "",
             "motivation_assessment": "",
-            "summary": "Evaluation could not be generated.",
+            "summary": error_reason or "Evaluation could not be generated.",
+            "answers": [],
         }
+
+    state = state_from_evaluation(evaluation)
 
     timestamp = datetime.now()
     markdown = _render_markdown_report(
@@ -571,11 +551,6 @@ async def on_session_close(
 
     if sheets_service.worksheet is not None:
         sheet_row = dict(evaluation)
-        # Prefer tool-captured name/role for the sheet too.
-        if state.candidate_name:
-            sheet_row["candidate_name"] = state.candidate_name
-        if state.selected_role:
-            sheet_row["selected_role"] = state.selected_role
         sheet_row["conversation_transcript"] = transcript
         await sheets_service.save_interview_result(session_id, sheet_row)
     else:
@@ -585,14 +560,16 @@ async def on_session_close(
 # ---------------------------------------------------------------------------
 # Entrypoint
 # ---------------------------------------------------------------------------
-server = AgentServer()
+# shutdown_process_timeout default is 10s — not enough for the post-call
+# LLM evaluation + Sheets write. Give it a full minute.
+server = AgentServer(shutdown_process_timeout=60.0)
 
 def prewarm(proc: JobProcess) -> None:
     proc.userdata["vad"] = silero.VAD.load()
 
 
-# @server.rtc_session()
-@server.rtc_session(agent_name="mars-recruiter")
+@server.rtc_session()
+#@server.rtc_session(agent_name="mars-recruiter")
 async def entrypoint(ctx: JobContext) -> None:
     ctx.log_context_fields = {"room": ctx.room.name}
     logger.info("starting agent in room %s", ctx.room.name)
@@ -616,7 +593,6 @@ async def entrypoint(ctx: JobContext) -> None:
         vad=ctx.proc.userdata["vad"],
         turn_handling=TurnHandlingOptions(
             turn_detection=MultilingualModel(),
-            interruption={"mode": "adaptive"},
         ),
         tts_text_transforms=[
             "filter_emoji",
@@ -624,11 +600,6 @@ async def entrypoint(ctx: JobContext) -> None:
             text_transforms.replace({"LiveKit": "<<ˈ|l|aɪ|v>> <<ˈ|k|ɪ|t>>"}),
         ],
     )
-
-    @session.on("session_usage_updated")
-    def _on_session_usage_updated(ev: SessionUsageUpdatedEvent) -> None:
-        for model_usage in ev.usage.model_usage:
-            logger.info("usage: %s", model_usage)
 
     @session.on("conversation_item_added")
     def _on_conversation_item_added(ev: ConversationItemAddedEvent) -> None:
@@ -650,14 +621,16 @@ async def entrypoint(ctx: JobContext) -> None:
     agent = InterviewAssistant(jobs)
 
     async def _on_shutdown() -> None:
-        await on_session_close(session, agent, session_id)
+        for model_usage in session.usage.model_usage:
+            logger.info("usage: %s", model_usage)
+        await on_session_close(session, session_id)
 
     ctx.add_shutdown_callback(_on_shutdown)
 
     await session.start(
         room=ctx.room,
         agent=agent,
-        room_input_options=room_io.RoomInputOptions(),
+        room_options=room_io.RoomOptions(),
     )
 
     await session.generate_reply(
