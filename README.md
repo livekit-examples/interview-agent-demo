@@ -2,22 +2,27 @@
 
 A LiveKit Agents demo that conducts a first-round phone screening for
 prospective Mars settlers. The agent greets the candidate, discusses
-open mission roles from the catalog, runs two short interview
-questions (background, motivation for Mars), and closes warmly. After
-the call ends, the full transcript is sent to an LLM once to produce a
-structured JSON evaluation and a short markdown report. Results are
-written locally and, optionally, appended to a Google Sheet.
+open mission roles from the catalog, runs two short interview questions
+(background, motivation for Mars), and closes warmly.
 
-The agent is intentionally simple — a single `Agent` with one system
-prompt, no function tools, no task groups. All structured capture
-happens post-call by re-prompting the LLM with the transcript.
+Structured capture uses three lightweight function tools the LLM calls
+during the call — `record_candidate_name`, `record_selected_role`, and
+`record_interview_answer` (once per question, with strengths and
+concerns). After the call ends, the transcript + captured notes are
+sent to the LLM once more to produce an executive summary, a
+recommendation, and a score.
+
+Each interview produces a rich markdown report at
+`./reports/interview_<date>_<time>_<sessionId>.md` and a row appended
+to a Google Sheet.
 
 ## Project layout
 
 ```
 interview_agent.py   # the agent (entrypoint)
-google_sheets.py     # optional Google Sheets integration (ADC-auth)
+google_sheets.py     # Google Sheets writer
 mars_jobs.json       # catalog of open Mars mission roles
+reports/             # rich markdown interview reports (gitignored)
 env.example          # sample .env — copy to .env.local and fill in
 ```
 
@@ -103,10 +108,14 @@ Connect the test client at [https://agents-playground.livekit.io/](https://agent
 
 ## Google Sheets (optional)
 
-Results are additionally appended to a Google Sheet when configured.
+In addition to the local markdown report in `./reports/`, each completed
+interview is appended as a row to a Google Sheet when configured.
 Authentication uses a **Google Cloud service account JSON key**, picked
 up automatically via `GOOGLE_APPLICATION_CREDENTIALS`. `google.auth.default()`
 detects the env var and hands the service-account credentials to gspread.
+
+If Sheets isn't configured, the agent still writes the markdown report
+locally and logs a warning — only the sheet row is skipped.
 
 ### One-time setup
 
