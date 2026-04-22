@@ -43,14 +43,15 @@ from livekit.agents import (
     AgentServer,
     AgentSession,
     AgentTask,
+    ConversationItemAddedEvent,
     JobContext,
     JobProcess,
-    MetricsCollectedEvent,
     RunContext,
+    SessionUsageUpdatedEvent,
     TurnHandlingOptions,
     cli,
+    inference,
     llm,
-    metrics,
     room_io,
     text_transforms,
 
@@ -118,37 +119,26 @@ def build_stt_llm_tts():
         STT_URL, STT_MODEL, LLM_URL, LLM_MODEL, TTS_URL, TTS_MODEL, TTS_VOICE,
     )
 
+    #stt_inst=inference.STT("deepgram/nova-3", language="multi")
     stt_inst = simplismart.STT(
         base_url=STT_URL,
         api_key=api_key,
         model=STT_MODEL,
     )
 
+    #llm_inst=inference.LLM("openai/gpt-4.1-mini")
     llm_inst = openai.LLM(
         model=LLM_MODEL,
         api_key=api_key,
         base_url=LLM_URL,
     )
 
-    if TTS_URL.endswith("/audio/speech"):
-        # OpenAI-compatible endpoint: pass the URL as-is; openai.TTS will POST to it.
-        tts_kwargs: dict[str, Any] = dict(
-            model=TTS_MODEL,
-            api_key=api_key,
-            base_url=TTS_URL,
-        )
-        if TTS_VOICE:
-            tts_kwargs["voice"] = TTS_VOICE
-        tts_inst = openai.TTS(**tts_kwargs)
-    else:
-        simp_kwargs: dict[str, Any] = dict(
-            base_url=TTS_URL,
-            api_key=api_key,
-            model=TTS_MODEL,
-        )
-        if TTS_VOICE:
-            simp_kwargs["voice"] = TTS_VOICE
-        tts_inst = simplismart.TTS(**simp_kwargs)
+    #tts_inst=inference.TTS("cartesia/sonic-3", voice="9626c31c-bec5-4cca-baa8-f8ba9e84c8bc")
+    tts_inst = simplismart.TTS(
+        base_url=TTS_URL,
+        api_key=api_key,
+        model="canopylabs/orpheus-3b-0.1-ft"
+    )
 
     return stt_inst, llm_inst, tts_inst
 
@@ -1678,9 +1668,24 @@ async def entrypoint(ctx: JobContext) -> None:
         ],
     )
 
-    @session.on("metrics_collected")
-    def _on_metrics_collected(ev: MetricsCollectedEvent) -> None:
-        metrics.log_metrics(ev.metrics)
+    @session.on("session_usage_updated")
+    def _on_session_usage_updated(ev: SessionUsageUpdatedEvent) -> None:
+        for model_usage in ev.usage.model_usage:
+            logger.info("usage: %s", model_usage)
+
+    @session.on("conversation_item_added")
+    def _on_conversation_item_added(ev: ConversationItemAddedEvent) -> None:
+        if not isinstance(ev.item, llm.ChatMessage):
+            return
+        m = ev.item.metrics or {}
+        if ev.item.role == "assistant":
+            ttft = m.get("llm_node_ttft")
+            ttfb = m.get("tts_node_ttfb")
+            e2e = m.get("e2e_latency")
+            logger.info(
+                "assistant turn latency — ttft=%.3fs ttfb=%.3fs e2e=%.3fs",
+                ttft or 0.0, ttfb or 0.0, e2e or 0.0,
+            )
 
     async def log_usage():
         logger.info(f"Usage: {session.usage}")
